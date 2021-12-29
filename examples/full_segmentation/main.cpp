@@ -98,7 +98,7 @@ int main(int argc, char** argv)
   parseCommandLine(argc, argv, inputPath, outputDirname, visualize, save);
 
   if (outputDirname == "")
-    outputDirname = "default";
+    outputDirname = "results";
 
   //----------------------------------------------------------------------------
   // Generate paths and check command line arguments
@@ -138,10 +138,7 @@ int main(int argc, char** argv)
 
   std::string octomapFilename             = utl::fullfile(sceneDirname, "occupancy.bt");
   std::string tablePlaneFilename          = utl::fullfile(sceneDirname, "table_plane.txt");
-  std::string symmetrySegmentationDirname = utl::fullfile(sceneDirname, "rotational_symmetry_segmentation");
-  std::string resultDirname               = utl::fullfile(symmetrySegmentationDirname, outputDirname);
-  std::string symmetryFilename            = utl::fullfile(resultDirname, "symmetries.txt");
-  std::string segmentationFilename        = utl::fullfile(resultDirname, "segments.txt");
+  std::string outputFolder                = utl::fullfile(sceneDirname, "results");
 
   //////////////////////////////////////////////////////////////////////////////
   ///////////////////////           PARAMETERS           ///////////////////////
@@ -419,6 +416,29 @@ int main(int argc, char** argv)
   std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
 
   //////////////////////////////////////////////////////////////////////////////
+  /// save rot segmentation results
+  std::string command = "mkdir -p " + outputFolder;
+  system(command.c_str());
+
+  std::string outputPath = outputFolder + "/segments.txt";
+  std::ofstream file(outputPath);
+  if (!file.is_open()) {
+    std::cout << outputPath << " cannot be opened. Exit." << std::endl;
+  }
+  for (size_t segId = 0; segId < rotSegmentFilteredIds.size(); ++segId)
+  {
+    std::vector<int> rotSegment = rotSegments[segId];
+    for (size_t lr_idx : rotSegment)
+    {
+      for (size_t hr_idx : downsampleMap[lr_idx])
+      {
+        file << hr_idx << " ";
+      }
+    }
+    file << std::endl;
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
   //////////////////////           REFLECTIONAL           //////////////////////
   //////////////////////////////////////////////////////////////////////////////
 
@@ -635,6 +655,20 @@ int main(int argc, char** argv)
 
   std::cout << "  " << reflSegmentMergedIdsRefined.size() << " merged refined segments." << std::endl;
   std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
+
+  for (size_t segId = 0; segId < reflSegmentMergedIdsRefined.size(); ++segId)
+  {
+    std::vector<int> reflSegment = reflSegmentsFinal[segId];
+    for (size_t lr_idx : reflSegment)
+    {
+      for (size_t hr_idx : downsampleMap[lr_idx])
+      {
+        file << hr_idx << " ";
+      }
+    }
+    file << std::endl;
+  }
+  file.close();
 
   //----------------------------------------------------------------------------
   // Remove duplicate symmetries
