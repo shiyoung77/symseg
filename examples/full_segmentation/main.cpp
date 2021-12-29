@@ -30,6 +30,8 @@
 /*  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.     */
 /*****************************************************************************/
 
+#include <thread>
+
 // PCL
 #include <pcl/io/ply_io.h>
 #include <pcl/common/time.h>
@@ -61,54 +63,54 @@ void parseCommandLine(int argc, char** argv, std::string &inputPath, std::string
   outputDirname = "";
   visualize = true;
   save = false;
-  
+
   // Check parameters
   for (size_t i = 1; i < static_cast<size_t>(argc); i++)
   {
     std::string curParameter (argv[i]);
-        
+
     if (curParameter == "-novis")
-      visualize = false;   
-    
+      visualize = false;
+
     else if (curParameter == "-save")
       save = true;
-        
+
     else if (inputPath == "" && curParameter[0] != '-')
       inputPath = curParameter;
 
     else if (outputDirname == "" && curParameter[0] != '-')
       outputDirname = curParameter;
-    
-    else 
+
+    else
       std::cout << "Unknown parameter '" << curParameter << "'" << std::endl;
-  }  
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char** argv)
-{  
+{
   //----------------------------------------------------------------------------
   // Parse command line
   //----------------------------------------------------------------------------
-  
+
   std::string inputPath, outputDirname;
   bool visualize, save;
   parseCommandLine(argc, argv, inputPath, outputDirname, visualize, save);
-  
+
   if (outputDirname == "")
     outputDirname = "default";
 
   //----------------------------------------------------------------------------
   // Generate paths and check command line arguments
   //----------------------------------------------------------------------------
-  
+
   std::string sceneDirname, sceneCloudFilename;
-  
+
   if (inputPath == "")
   {
     std::cout << "You must provide an input path corresponding to a  pointcloud filename or a scene directory containing the pointcloud." << std::endl;
   }
-  
+
   // Get scene directory
   if (utl::isDirectory(inputPath))
   {
@@ -123,18 +125,18 @@ int main(int argc, char** argv)
   {
     std::cout << "Could not find a directory or file with path '" << inputPath << "'." << std::endl;
   }
-  
+
   // Get scene cloud filename
   sceneCloudFilename = utl::fullfile(sceneDirname, "cloud.ply");
   std::cout << "Scene directory: " << sceneDirname << std::endl;
-  
+
   if (!utl::isFile(sceneCloudFilename))
   {
     std::cout << "Couldn't find pointcloud file '" << sceneCloudFilename << "'" << std::endl;
     return -1;
   }
 
-  std::string octomapFilename             = utl::fullfile(sceneDirname, "occupancy.bt");  
+  std::string octomapFilename             = utl::fullfile(sceneDirname, "occupancy.bt");
   std::string tablePlaneFilename          = utl::fullfile(sceneDirname, "table_plane.txt");
   std::string symmetrySegmentationDirname = utl::fullfile(sceneDirname, "rotational_symmetry_segmentation");
   std::string resultDirname               = utl::fullfile(symmetrySegmentationDirname, outputDirname);
@@ -144,15 +146,15 @@ int main(int argc, char** argv)
   //////////////////////////////////////////////////////////////////////////////
   ///////////////////////           PARAMETERS           ///////////////////////
   //////////////////////////////////////////////////////////////////////////////
-  
+
   // Scene oversegmentation parameters
   utl::SmoothSegParams sceneOversegParams;
   sceneOversegParams.voxel_size = 0.005f;
   sceneOversegParams.min_segment_size = 120;
   sceneOversegParams.max_iou = 0.8f;
   sceneOversegParams.smoothness = { std::pair<float, float>(pcl::deg2rad(10.0f), 0.5f),
-                                    std::pair<float, float>(pcl::deg2rad(15.0f), 0.5f) };  
-                                    
+                                    std::pair<float, float>(pcl::deg2rad(15.0f), 0.5f) };
+
   // Rotatioanal symmetry detection parameters
   sym::RotSymDetectParams rotDetParams;
   rotDetParams.ref_max_fit_angle       = pcl::deg2rad(45.0f);
@@ -164,7 +166,7 @@ int main(int argc, char** argv)
   rotDetParams.max_occlusion_score     = 0.012f;
   rotDetParams.max_perpendicular_score = 0.6f;
   rotDetParams.min_coverage_score      = 0.3f;
-  
+
   // Rotational segmentation parameters
   sym::RotSymSegParams rotSegParams;
   rotSegParams.voxel_size = sceneOversegParams.voxel_size;
@@ -180,7 +182,7 @@ int main(int argc, char** argv)
   rotSegParams.fg_weight_importance  = 1.0f;
   rotSegParams.bg_weight_importance  = 1.0f;
   rotSegParams.bin_weight_importance = 2.0f;
-  
+
   rotSegParams.max_symmetry_score    = 0.03f;
   rotSegParams.max_occlusion_score   = 0.015f;
   rotSegParams.max_smoothness_score  = 0.3f;
@@ -192,30 +194,30 @@ int main(int argc, char** argv)
   reflDetParams.num_angle_divisions         = 5;
   reflDetParams.flatness_threshold          = 0.005f;
   reflDetParams.refine_iterations           = 20;
-  
+
   reflDetParams.max_correspondence_reflected_distance = 0.01f;
   reflDetParams.max_occlusion_distance                = 0.03f;
   reflDetParams.min_inlier_normal_angle               = pcl::deg2rad(15.0f);
   reflDetParams.max_inlier_normal_angle               = pcl::deg2rad(20.0f);
-    
+
   reflDetParams.max_occlusion_score           = 0.01f;
   reflDetParams.min_cloud_inlier_score        = 0.3f;
   reflDetParams.min_corresp_inlier_score      = 0.8f;
-  
+
   reflDetParams.symmetry_min_angle_diff       = pcl::deg2rad(7.0);
   reflDetParams.symmetry_min_distance_diff    = 0.01f;
   reflDetParams.max_reference_point_distance  = 0.3f;
-  
+
   // Reflectional symmetry segmentation parameters
   sym::ReflSymSegParams reflSegParams;
   reflSegParams.voxel_size = 0.0f;
-  
+
   reflSegParams.max_sym_corresp_reflected_distance = 0.01f;
   reflSegParams.min_occlusion_distance = 0.01f;
   reflSegParams.max_occlusion_distance = 0.03f;
   reflSegParams.min_normal_fit_angle = pcl::deg2rad(10.0f);
   reflSegParams.max_normal_fit_angle = pcl::deg2rad(45.0f);
-  
+
   reflSegParams.aw_radius = std::max(reflSegParams.voxel_size, 0.005f) * 2.0f;
   reflSegParams.aw_num_neighbors = 9;
   reflSegParams.aw_sigma_convex = 2.0f;
@@ -223,37 +225,37 @@ int main(int argc, char** argv)
   reflSegParams.fg_weight_importance  = 1.0f;
   reflSegParams.bg_weight_importance  = 2.0f;
   reflSegParams.bin_weight_importance = 5.0f;
-  
+
   reflSegParams.max_symmetry_score    = 0.3f;
   reflSegParams.max_occlusion_score   = 0.005f;
   reflSegParams.max_smoothness_score  = 0.3f;
   reflSegParams.min_segment_size      = 200;
   reflSegParams.min_symmetry_support_overlap      = 0.5f;
   reflSegParams.similar_segment_iou_ = 0.95f;
-  
+
   // Occupancy map parameters
-  float occupancyMapBBXInflationRadius = 0.15f;                                    // Inflation radius of the distance map bounding box relative to the scene cloud bounding box  
+  float occupancyMapBBXInflationRadius = 0.15f;                                    // Inflation radius of the distance map bounding box relative to the scene cloud bounding box
   float occupancyMapMaxDistance = std::max( std::max(rotSegParams.max_occlusion_distance, rotDetParams.max_occlusion_distance),
                                             std::max(reflSegParams.max_occlusion_distance, reflDetParams.max_occlusion_distance));
-  
+
   //////////////////////////////////////////////////////////////////////////////
   ///////////////////////           DATA LOAD            ///////////////////////
   //////////////////////////////////////////////////////////////////////////////
 
   std::cout << "Loading data..." << std::endl;
-  
+
   pcl::PointCloud<PointNC>::Ptr sceneCloudHighRes  (new pcl::PointCloud<PointNC>);
   if (pcl::io::loadPLYFile (sceneCloudFilename, *sceneCloudHighRes))
     return -1;
-  
+
   // Read scene octree
   OccupancyMapPtr sceneOccupancyMap (new OccupancyMap);
   if (!sceneOccupancyMap->readOccupancyTree(octomapFilename))
     return -1;
-  
+
   std::cout << "  Octomap resolution: " << sceneOccupancyMap->getOccupancyTreeResolution () << " metres" << std::endl;
   std::cout << "  Octomap depth: " << sceneOccupancyMap->getOccupancyTreeDepth() << std::endl;
-  
+
   // Read tabple plane coefficients
   Eigen::Vector4f tablePlaneCoefficients;
   utl::readASCII(tablePlaneFilename, tablePlaneCoefficients);
@@ -262,11 +264,11 @@ int main(int argc, char** argv)
     std::cout << "Table plane coefficients must have 4 values, instead has " << tablePlaneCoefficients.size() << " values." << std::endl;
     return -1;
   }
-  
+
   //----------------------------------------------------------------------------
   // Create a scene occupancy map
   //----------------------------------------------------------------------------
-    
+
   std::cout << "Constructing scene occupancy map..." << std::endl;
   double start = pcl::getTime ();
   double totalStart = pcl::getTime ();
@@ -276,41 +278,41 @@ int main(int argc, char** argv)
   pcl::getMinMax3D(*sceneCloudHighRes, bbxMin, bbxMax);
   bbxMin.array() -= occupancyMapBBXInflationRadius;
   bbxMax.array() += occupancyMapBBXInflationRadius;
-  
+
   // Initialize map
   sceneOccupancyMap->setBoundingPlanes(std::vector<Eigen::Vector4f> (1, tablePlaneCoefficients));
   sceneOccupancyMap->distanceMapFromOccupancy ( bbxMin.head(3), bbxMax.head(3),
                                                 sceneOccupancyMap->getOccupancyTreeDepth(),
                                                 occupancyMapMaxDistance,
                                                 true  );
-      
+
   std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
-                                    
+
   //////////////////////////////////////////////////////////////////////////////
   ////////////////           SCENE OVERSEGMENTATION            /////////////////
   //////////////////////////////////////////////////////////////////////////////
-  
+
   pcl::PointCloud<PointNC>::Ptr     sceneCloud                (new pcl::PointCloud<PointNC>);
   utl::Map                     downsampleMap;
   std::vector<utl::Map>        oversegSegments;
   utl::Map                     oversegSegmentsLinear;
-  
+
   oversegmentScene<PointNC> (sceneCloudHighRes, sceneOversegParams, sceneCloud, downsampleMap, oversegSegments, oversegSegmentsLinear);
 
   //////////////////////////////////////////////////////////////////////////////
   ///////////////////////           ROTATIONAL           ///////////////////////
   //////////////////////////////////////////////////////////////////////////////
-  
+
   //----------------------------------------------------------------------------
   // Symmetry detection
   //----------------------------------------------------------------------------
-    
+
   std::cout << "Detecting rotational symmetry..." << std::endl;
-  start = pcl::getTime (); 
-  
+  start = pcl::getTime ();
+
   std::vector<sym::RotationalSymmetry>  rotSymmetry;
   std::vector<std::vector<int> >        rotSymmetrySupport;
-  
+
   if (  !detectRotationalSymmetryScene<PointNC> ( sceneCloud,
                                                   sceneOccupancyMap,
                                                   oversegSegmentsLinear,
@@ -323,20 +325,20 @@ int main(int argc, char** argv)
   }
 
   std::cout << "  " << rotSymmetry.size() << " symmetries detected." << std::endl;
-  std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;  
-    
+  std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
+
   //----------------------------------------------------------------------------
   // Symmetry segmentation
   //----------------------------------------------------------------------------
-      
+
   std::cout << "Segmenting rotational objects..." << std::endl;
   start = pcl::getTime ();
 
-  // Variables  
+  // Variables
   utl::Map       rotSegments;
   std::vector<int>    rotSegmentFilteredIds;
   std::vector<float>  rotSymmetryScores, rotOcclusionScores, rotSmoothnessScores;
-  
+
   sym::RotationalSymmetrySegmentation<PointNC> rotSeg;
   rotSeg.setInputCloud(sceneCloud);
   rotSeg.setInputOcuppancyMap(sceneOccupancyMap);
@@ -346,22 +348,22 @@ int main(int argc, char** argv)
   rotSeg.filter();
   rotSeg.getSegments(rotSegments, rotSegmentFilteredIds);
   rotSeg.getScores(rotSymmetryScores, rotOcclusionScores, rotSmoothnessScores);
-  
+
   std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
-  
+
   //----------------------------------------------------------------------------
   // Refine symmetries given segments and filter
   //----------------------------------------------------------------------------
 
   std::cout << "Refining symmetry and filtering..." << std::endl;
   start = pcl::getTime ();
-    
+
   std::vector<sym::RotationalSymmetry>  rotSymmetryRefined             (rotSymmetry.size());
   std::vector<float>                    rotSymmetryScoresRefined       (rotSymmetry.size());
   std::vector<float>                    rotOcclusionScoresRefined      (rotSymmetry.size());
-  
+
   rotDetParams.ref_max_fit_angle = pcl::deg2rad(5.f);
-  
+
   # pragma omp parallel for
   for (size_t segId = 0; segId < rotSegments.size(); segId++)
   {
@@ -375,7 +377,7 @@ int main(int argc, char** argv)
       pcl::PointCloud<PointNC>::Ptr segmentCloud (new pcl::PointCloud<PointNC>);
       pcl::copyPointCloud<PointNC>(*sceneCloud, rotSegments[segId], *segmentCloud);
       std::vector<sym::RotationalSymmetry> symmetriesInitial (1, rotSymmetry[segId]);
-      
+
       // Output variables
       std::vector<sym::RotationalSymmetry> symmetriesRefinedTMP;
       std::vector<int>  symmetryFilteredIdsTMP, symmetryMergedIdsTMP;
@@ -383,7 +385,7 @@ int main(int argc, char** argv)
       std::vector<float>  occlusionScoresRefinedTMP;
       std::vector<float>  perpendicularScoresRefinedTMP;
       std::vector<float>  coverageScoresRefinedTMP;
-      
+
       // Refine
       sym::RotationalSymmetryDetection<PointNC> rsd (rotDetParams);
       rsd.setInputCloud(segmentCloud);
@@ -392,14 +394,14 @@ int main(int argc, char** argv)
       rsd.detect();
       rsd.getSymmetries(symmetriesRefinedTMP, symmetryFilteredIdsTMP, symmetryMergedIdsTMP);
       rsd.getScores(symmetryScoresRefinedTMP, occlusionScoresRefinedTMP, perpendicularScoresRefinedTMP, coverageScoresRefinedTMP);
-      
+
       // Get output
       rotSymmetryRefined[segId] = symmetriesRefinedTMP[0];
       rotSymmetryScoresRefined[segId] = symmetryScoresRefinedTMP[0];
       rotOcclusionScoresRefined[segId] = occlusionScoresRefinedTMP[0];
     }
   }
-   
+
   rotSegmentFilteredIds.clear();
   for (size_t segId = 0; segId < rotSegments.size(); segId++)
   {
@@ -412,14 +414,14 @@ int main(int argc, char** argv)
       rotSegmentFilteredIds.push_back(segId);
     }
   }
-  
+
   std::cout << "  " << rotSegmentFilteredIds.size() << " filtered segments." << std::endl;
-  std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;  
-  
+  std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
+
   //////////////////////////////////////////////////////////////////////////////
   //////////////////////           REFLECTIONAL           //////////////////////
   //////////////////////////////////////////////////////////////////////////////
-  
+
   //----------------------------------------------------------------------------
   // Remove rotational segments from the pointcloud
   //----------------------------------------------------------------------------
@@ -429,7 +431,7 @@ int main(int argc, char** argv)
   for (size_t rotSegIdIt = 0; rotSegIdIt < rotSegmentFilteredIds.size(); rotSegIdIt++)
   {
     int rotSegId = rotSegmentFilteredIds[rotSegIdIt];
-    
+
     for (size_t pointIdIt = 0; pointIdIt < rotSegments[rotSegId].size(); pointIdIt++)
       rotationalSegmentsMask[rotSegments[rotSegId][pointIdIt]] = true;
   }
@@ -445,7 +447,7 @@ int main(int argc, char** argv)
       if (!rotationalSegmentsMask[edge.vtx1Id_] && !rotationalSegmentsMask[edge.vtx2Id_])
         graph_tmp.addEdge(edge.vtx1Id_, edge.vtx2Id_);
   }
-  
+
   utl::Map subSegments = utl::getConnectedComponents(graph_tmp);
   for (size_t i = 0; i < subSegments.size(); i++)
     if (subSegments[i].size() < 15)
@@ -455,26 +457,26 @@ int main(int argc, char** argv)
   // Get non-rotaional pointcloud
   std::vector<int> cloudAfterRotIndices;    // Points belonging to filtered cloud
   std::vector<int> cloudAfterRotIndicesInverse (sceneCloud->size(), -1);
-  
+
   for (size_t pointId = 0; pointId < rotationalSegmentsMask.size(); pointId++)
   {
     if (!rotationalSegmentsMask[pointId])
     {
-      cloudAfterRotIndicesInverse[pointId] = cloudAfterRotIndices.size(); 
+      cloudAfterRotIndicesInverse[pointId] = cloudAfterRotIndices.size();
       cloudAfterRotIndices.push_back(pointId);
     }
   }
-  
+
   pcl::PointCloud<PointNC>::Ptr sceneCloudAfterRot (new pcl::PointCloud<PointNC>);
-  pcl::copyPointCloud<PointNC>(*sceneCloud, cloudAfterRotIndices, *sceneCloudAfterRot);  
+  pcl::copyPointCloud<PointNC>(*sceneCloud, cloudAfterRotIndices, *sceneCloudAfterRot);
 
   //----------------------------------------------------------------------------
   // Remove segments that are already used for rotational symmetry
   //----------------------------------------------------------------------------
-  
+
   std::vector<utl::Map>        oversegSegmentsAfterRot (sceneOversegParams.smoothness.size());
   utl::Map                     oversegSegmentsAfterRotLinear;
-    
+
   for (size_t segParamId = 0; segParamId < sceneOversegParams.smoothness.size(); segParamId++)
   {
     for (size_t oversegSegId = 0; oversegSegId < oversegSegments[segParamId].size(); oversegSegId++)
@@ -487,7 +489,7 @@ int main(int argc, char** argv)
         if (!rotationalSegmentsMask[pointId])
           curSegmentAfterRot.push_back(cloudAfterRotIndicesInverse[pointId]);
       }
-      
+
       if (curSegmentAfterRot.size() > sceneOversegParams.min_segment_size)
       {
         oversegSegmentsAfterRot[segParamId].push_back(curSegmentAfterRot);
@@ -495,17 +497,17 @@ int main(int argc, char** argv)
       }
     }
   }
-  
+
   //----------------------------------------------------------------------------
   // Symmetry detection
   //----------------------------------------------------------------------------
-    
+
   std::cout << "Detecting reflectional symmetry..." << std::endl;
-  start = pcl::getTime (); 
-  
+  start = pcl::getTime ();
+
   std::vector<sym::ReflectionalSymmetry>  reflSymmetry;
   std::vector<std::vector<int> >          reflSymmetrySupport;
-  
+
   if (  !detectReflectionalSymmetryScene<PointNC> ( sceneCloudAfterRot,
                                                     sceneOccupancyMap,
                                                     oversegSegmentsAfterRotLinear,
@@ -518,20 +520,20 @@ int main(int argc, char** argv)
   }
 
   std::cout << "  " << reflSymmetry.size() << " symmetries detected." << std::endl;
-  std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;  
-  
+  std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
+
   //----------------------------------------------------------------------------
   // Symmetry segmentation
   //----------------------------------------------------------------------------
-      
+
   std::cout << "Segmenting reflectional objects..." << std::endl;
   start = pcl::getTime ();
 
-  // Variables  
+  // Variables
   utl::Map                   reflSegments;
   std::vector<int>                reflSegmentFilteredIds;
   std::vector<std::vector<int> >  reflSegmentMergedIds;
-  
+
   sym::ReflectionalSymmetrySegmentation<PointNC> reflSeg;
   reflSeg.setInputCloud(sceneCloudAfterRot);
   reflSeg.setInputOcuppancyMap(sceneOccupancyMap);
@@ -542,16 +544,16 @@ int main(int argc, char** argv)
   reflSeg.getSegments(reflSegments, reflSegmentFilteredIds, reflSegmentMergedIds);
 
   std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
-  
+
   //----------------------------------------------------------------------------
   // Refine symmetries given segments
   //----------------------------------------------------------------------------
 
   std::cout << "Refining symmetry..." << std::endl;
   start = pcl::getTime ();
-    
+
   std::vector<sym::ReflectionalSymmetry>  reflSymmetryRefined (reflSegments.size());
-  
+
   # pragma omp parallel for
   for (size_t segId = 0; segId < reflSegments.size(); segId++)
   {
@@ -565,11 +567,11 @@ int main(int argc, char** argv)
       pcl::PointCloud<PointNC>::Ptr segmentCloud (new pcl::PointCloud<PointNC>);
       pcl::copyPointCloud<PointNC>(*sceneCloudAfterRot, reflSegments[segId], *segmentCloud);
       std::vector<sym::ReflectionalSymmetry> symmetriesInitial (1, reflSymmetry[segId]);
-      
+
       // Output variables
       std::vector<sym::ReflectionalSymmetry> symmetriesRefinedTMP;
       std::vector<int>  symmetryFilteredIdsTMP, symmetryMergedIdsTMP;
-      
+
       // Refine
       sym::ReflectionalSymmetryDetection<PointNC> rsd (reflDetParams);
       rsd.setInputCloud(segmentCloud);
@@ -590,7 +592,7 @@ int main(int argc, char** argv)
       }
     }
   }
-  
+
   std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
 
   //----------------------------------------------------------------------------
@@ -599,21 +601,21 @@ int main(int argc, char** argv)
 
   std::cout << "Segmenting refined..." << std::endl;
   start = pcl::getTime ();
-      
+
   std::vector<std::vector<int> >    reflSegmentsRefined;
   std::vector<int>                  reflSegmentFilteredIdsRefined;
   std::vector<std::vector<int> >    reflSegmentMergedIdsRefined;
-  
+
   reflSeg.setInputSymmetries(reflSymmetryRefined, reflSymmetrySupport);
   reflSeg.segment();
   reflSeg.filter();
   reflSeg.merge();
   reflSeg.getSegments(reflSegmentsRefined, reflSegmentFilteredIdsRefined, reflSegmentMergedIdsRefined);
-  
+
   // Convert segments to full cloud
   utl::Map reflSegmentsFinal (reflSegmentMergedIdsRefined.size());
   std::vector<std::vector<sym::ReflectionalSymmetry> > reflSymmetryFinal (reflSegmentMergedIdsRefined.size());
-  
+
   for (size_t segIdIt = 0; segIdIt < reflSegmentMergedIdsRefined.size(); segIdIt++)
   {
     std::vector<int> curSegment = reflSegmentsRefined[reflSegmentMergedIdsRefined[segIdIt][0]];
@@ -623,34 +625,34 @@ int main(int argc, char** argv)
       curSegment[pointIdIt] = cloudAfterRotIndices[pointId];
     }
     reflSegmentsFinal[segIdIt] = curSegment;
-    
+
     for (size_t symIdIt = 0; symIdIt < reflSegmentMergedIdsRefined[segIdIt].size(); symIdIt++)
     {
       int symId = reflSegmentMergedIdsRefined[segIdIt][symIdIt];
       reflSymmetryFinal[segIdIt].push_back(reflSymmetryRefined[symId]);
     }
   }
-  
+
   std::cout << "  " << reflSegmentMergedIdsRefined.size() << " merged refined segments." << std::endl;
   std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
-  
+
   //----------------------------------------------------------------------------
   // Remove duplicate symmetries
   //----------------------------------------------------------------------------
 
   std::cout << "Remove duplicate symmetries..." << std::endl;
   start = pcl::getTime ();
-  
+
   for (size_t segId = 0; segId < reflSymmetryFinal.size(); segId++)
   {
     std::vector<int> merged;
-    
+
     // Get mean
     pcl::PointCloud<PointNC>::Ptr segmentCloud (new pcl::PointCloud<PointNC>);
     pcl::copyPointCloud<PointNC>(*sceneCloud, reflSegmentsFinal[segId], *segmentCloud);
     Eigen::Vector4f centroid;
     pcl::compute3DCentroid(*segmentCloud, centroid);
-    
+
     sym::mergeDuplicateReflSymmetries ( reflSymmetryFinal[segId],
                                         std::vector<Eigen::Vector3f> (reflSymmetryFinal[segId].size(), centroid.head(3)),
                                         std::vector<float> (reflSymmetryFinal[segId].size(), 1.0),
@@ -659,14 +661,14 @@ int main(int argc, char** argv)
                                         reflDetParams.symmetry_min_distance_diff,
                                         reflDetParams.max_reference_point_distance
                                       );
-    
+
     std::vector<sym::ReflectionalSymmetry> symmetriesFiltered;
     for (size_t i = 0; i < merged.size(); i++)
       symmetriesFiltered.push_back(reflSymmetryFinal[segId][merged[i]]);
-    
+
     reflSymmetryFinal[segId] = symmetriesFiltered;
   }
-  
+
   std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
 
   //////////////////////////////////////////////////////////////////////////////
@@ -678,14 +680,14 @@ int main(int argc, char** argv)
   // std::ofstream outfile;
   // outfile.open("./full_segmentation_timings.txt", std::ios_base::app);
   // outfile << utl::getBasename(sceneDirname) << ": " << execution_time << "\n";
-  
+
   //////////////////////////////////////////////////////////////////////////////
   /////////////////////           VISUALIZATION           //////////////////////
   //////////////////////////////////////////////////////////////////////////////
 
   if (!visualize)
     return 0;
-    
+
   //Print instructions
   std::cout << "-------------------------------" << std::endl;
   std::cout << "|   Visualization controls    |" << std::endl;
@@ -702,9 +704,9 @@ int main(int argc, char** argv)
                                   0.0, -1.0, 0.0,   // normal
                                   0.0);            // viewport
   visualizer.setBackgroundColor (utl::bgColor.r, utl::bgColor.g, utl::bgColor.b);
-  visualizer.registerKeyboardCallback(keyboard_callback, (void*)(&visState));  
+  visualizer.registerKeyboardCallback(keyboard_callback, (void*)(&visState));
   visState.updateDisplay_ = true;
-    
+
   while (!visualizer.wasStopped())
   {
     // Update display if needed
@@ -715,19 +717,19 @@ int main(int argc, char** argv)
       visualizer.removeAllShapes();
       visualizer.removeAllCoordinateSystems();
       visState.updateDisplay_ = false;
-            
+
       // Show occupancy
       if (visState.showOccupancy_)
       {
         sceneOccupancyMap->showObstacleSpaceBoundaryMesh(visualizer);
       }
-      
+
       // Then add things as required
       if (visState.cloudDisplay_ == VisState::CLOUD || visState.cloudDisplay_ == VisState::CLOUD_AFTER_ROT)
       {
         pcl::PointCloud<PointNC>::Ptr cloudDisplay (new pcl::PointCloud<PointNC>);
         std::string text;
-        
+
         if (visState.cloudDisplay_ == VisState::CLOUD)
         {
           cloudDisplay = sceneCloud;
@@ -738,14 +740,14 @@ int main(int argc, char** argv)
           cloudDisplay = sceneCloudAfterRot;
           text = "Cloud after rotational";
         }
-        
+
         utl::showPointCloudColor<PointNC>(visualizer, cloudDisplay, "cloud", visState.pointSize_);
         if (visState.showNormals_)
           utl::showNormalCloud<PointNC>(visualizer, cloudDisplay, 10, 0.02, "normals", visState.pointSize_, utl::green);
-        
+
         visualizer.addText(text, 0, 150, 24, 1.0, 1.0, 1.0);
       }
-      
+
       else if ( visState.cloudDisplay_ == VisState::INITIAL_OVERSEGMENTAION  ||
                 visState.cloudDisplay_ == VisState::OVERSEGMENTATION_AFTER_ROT )
       {
@@ -764,10 +766,10 @@ int main(int argc, char** argv)
           segmentationDisplay = oversegSegmentsAfterRot;
           text = "Oversegmentation after rotational ";
         }
-        
+
         visState.segIterator_ = utl::clampValueCircular<int>(visState.segIterator_, 0, segmentationDisplay.size()-1);
         int segParamId = visState.segIterator_;
-        
+
         utl::showSegmentation<PointNC>(visualizer, cloudDisplay, segmentationDisplay[segParamId], "segment", visState.pointSize_);
 
         visualizer.addText(text + std::to_string(segParamId+1) + " / " + std::to_string(sceneOversegParams.smoothness.size()), 0, 150, 24, 1.0, 1.0, 1.0);
@@ -782,7 +784,7 @@ int main(int argc, char** argv)
         std::vector<sym::RotationalSymmetry> symmetryDisplay;
         std::vector<int> symmetryDisplayIds;
         std::string text;
-        
+
         if (visState.cloudDisplay_ == VisState::ROTATIONAL_SYMMETRIES)
         {
           symmetryDisplay = rotSymmetry;
@@ -794,31 +796,31 @@ int main(int argc, char** argv)
         else if (visState.cloudDisplay_ == VisState::ROTATIONAL_SEGMENTS)
         {
           symmetryDisplay = rotSymmetryRefined;
-          symmetrySegmentsDisplay = rotSegments;          
+          symmetrySegmentsDisplay = rotSegments;
           symmetryDisplayIds = rotSegmentFilteredIds;
           text = "Rotational segments";
         }
-        
+
         visState.segIterator_ = utl::clampValueCircular<int>(visState.segIterator_, 0, symmetryDisplayIds.size()-1);
         int symId = symmetryDisplayIds[visState.segIterator_];
-        
+
         utl::showFGSegmentationColor<PointNC>(visualizer, sceneCloud, symmetrySegmentsDisplay[symId], "object", visState.pointSize_);
-                
+
         // Show symmetry
         if (visState.showSymmetry_)
           sym::showRotationalSymmetry(visualizer, symmetryDisplay[symId], "symmetry", 0.5, 5.0);
-        
+
         visualizer.addText(text, 0, 150, 24, 1.0, 1.0, 1.0);
-        visualizer.addText("Symmetry " + std::to_string(visState.segIterator_+1) + " / " + std::to_string(symmetryDisplayIds.size()), 15, 125, 24, 1.0, 1.0, 1.0);        
+        visualizer.addText("Symmetry " + std::to_string(visState.segIterator_+1) + " / " + std::to_string(symmetryDisplayIds.size()), 15, 125, 24, 1.0, 1.0, 1.0);
       }
-      
+
       else if ( visState.cloudDisplay_ == VisState::REFLECTIONAL_SYMMETRIES)
       {
         std::vector<std::vector<int> > symmetrySegmentsDisplay;
         std::vector<sym::ReflectionalSymmetry> symmetryDisplay;
         std::vector<int> symmetryDisplayIds;
         std::string text;
-        
+
         if (visState.cloudDisplay_ == VisState::REFLECTIONAL_SYMMETRIES)
         {
           symmetryDisplay = reflSymmetry;
@@ -827,41 +829,41 @@ int main(int argc, char** argv)
             symmetryDisplayIds.push_back(symId);
           text = "Reflectional symmetry ";
         }
-        
+
         visState.segIterator_ = utl::clampValueCircular<int>(visState.segIterator_, 0, symmetryDisplayIds.size()-1);
         int symId = symmetryDisplayIds[visState.segIterator_];
-        
+
         utl::showFGSegmentationColor<PointNC>(visualizer, sceneCloudAfterRot, symmetrySegmentsDisplay[symId], "object", visState.pointSize_);
-                
+
         // Show symmetry
         if (visState.showSymmetry_)
           sym::showReflectionalSymmetry(visualizer, symmetryDisplay[symId], "symmetry", 0.2);
-        
+
         visualizer.addText(text, 0, 150, 24, 1.0, 1.0, 1.0);
-        visualizer.addText("Symmetry " + std::to_string(visState.segIterator_+1) + " / " + std::to_string(symmetryDisplayIds.size()), 15, 125, 24, 1.0, 1.0, 1.0);        
+        visualizer.addText("Symmetry " + std::to_string(visState.segIterator_+1) + " / " + std::to_string(symmetryDisplayIds.size()), 15, 125, 24, 1.0, 1.0, 1.0);
       }
-      
+
       else if ( visState.cloudDisplay_ == VisState::REFLECTIONAL_SEGMENTS)
       {
         visState.segIterator_ = utl::clampValueCircular<int>(visState.segIterator_, 0, reflSegmentsFinal.size()-1);
         int segId = visState.segIterator_;
-        
+
         utl::showFGSegmentationColor<PointNC>(visualizer, sceneCloud, reflSegmentsFinal[segId], "object", visState.pointSize_);
 
         visualizer.addText("Reflectional segments", 0, 150, 24, 1.0, 1.0, 1.0);
-        visualizer.addText("Segment " + std::to_string(segId+1) + " / " + std::to_string(reflSegmentMergedIdsRefined.size()), 15, 125, 24, 1.0, 1.0, 1.0);  
+        visualizer.addText("Segment " + std::to_string(segId+1) + " / " + std::to_string(reflSegmentMergedIdsRefined.size()), 15, 125, 24, 1.0, 1.0, 1.0);
       }
-      
+
       else if ( visState.cloudDisplay_ == VisState::FINAL_SEGMENTS )
-      {      
+      {
         int numReflSegments = reflSegmentsFinal.size();
         int numRotSegments  = rotSegmentFilteredIds.size();
         visState.segIterator_ = utl::clampValueCircular<int>(visState.segIterator_, 0, numReflSegments+numRotSegments-1);
         int segIdIt = visState.segIterator_;
-        
+
         int numReflSymmetries = 0;
         int numRotSymmetries = 0;
-        
+
         if (segIdIt < numRotSegments)
         {
           int symId = rotSegmentFilteredIds[segIdIt];
@@ -881,17 +883,17 @@ int main(int argc, char** argv)
           }
           numReflSymmetries = reflSymmetryFinal[symId].size();
         }
-        
+
         visualizer.addText("Final segments", 0, 150, 24, 1.0, 1.0, 1.0);
         visualizer.addText("Segment " + std::to_string(segIdIt+1) + " / " + std::to_string(numReflSegments+numRotSegments), 15, 125, 24, 1.0, 1.0, 1.0);
         visualizer.addText(std::to_string(numReflSymmetries + numRotSymmetries) + " symmetries", 0, 100, 24, 1.0, 1.0, 1.0);
       }
     }
-    
+
     // Spin once
     visualizer.spinOnce();
-    boost::this_thread::sleep (boost::posix_time::milliseconds (10));
+    std::this_thread::sleep_for(std::chrono::milliseconds (10));
   }
-  
+
   return 0;
 }

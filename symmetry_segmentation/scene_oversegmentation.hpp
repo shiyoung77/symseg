@@ -111,6 +111,7 @@ bool oversegmentScene ( const typename pcl::PointCloud<PointT>::ConstPtr  &scene
       overseg_segments_linear.push_back(oversegSegmentsRaw[segParamId][segId]);
     }
   }
+  return true;
 }
 
 #endif     // SCENE_OVERSEGMENTATION_HPP
