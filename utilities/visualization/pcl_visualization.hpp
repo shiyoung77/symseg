@@ -1010,7 +1010,8 @@ namespace utl
       colorC[0] = static_cast<unsigned char>(color.r * 255.0f);
       colorC[1] = static_cast<unsigned char>(color.g * 255.0f);
       colorC[2] = static_cast<unsigned char>(color.b * 255.0f);
-      colors->InsertNextTupleValue(colorC);
+      // colors->InsertNextTupleValue(colorC);
+      colors->InsertNextTypedTuple(colorC);
     }
     linesPolyData->GetCellData()->SetScalars(colors);      
     
