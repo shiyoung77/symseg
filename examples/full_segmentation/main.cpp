@@ -34,6 +34,7 @@
 
 // PCL
 #include <pcl/io/ply_io.h>
+#include <pcl/io/pcd_io.h>
 #include <pcl/common/time.h>
 
 // Utilities includes
@@ -132,8 +133,12 @@ int main(int argc, char** argv)
 
   if (!utl::isFile(sceneCloudFilename))
   {
-    std::cout << "Couldn't find pointcloud file '" << sceneCloudFilename << "'" << std::endl;
-    return -1;
+    sceneCloudFilename = utl::fullfile(sceneDirname, "cloud.pcd");
+    if (!utl::isFile(sceneCloudFilename))
+    {
+      std::cout << "Couldn't find pointcloud file '" << sceneCloudFilename << "'" << std::endl;
+      return -1;
+    }
   }
 
   std::string octomapFilename             = utl::fullfile(sceneDirname, "occupancy.bt");
@@ -239,11 +244,20 @@ int main(int argc, char** argv)
   ///////////////////////           DATA LOAD            ///////////////////////
   //////////////////////////////////////////////////////////////////////////////
 
-  std::cout << "Loading data..." << std::endl;
+  std::cout << "Loading data from: " << sceneCloudFilename << std::endl;
 
   pcl::PointCloud<PointNC>::Ptr sceneCloudHighRes  (new pcl::PointCloud<PointNC>);
-  if (pcl::io::loadPLYFile (sceneCloudFilename, *sceneCloudHighRes))
-    return -1;
+  if (sceneCloudFilename.compare(sceneCloudFilename.size() - 3, 3, "ply") == 0) {
+    if (pcl::io::loadPLYFile(sceneCloudFilename, *sceneCloudHighRes)) {
+      return -1;
+    }
+  }
+  else if (sceneCloudFilename.compare(sceneCloudFilename.size() - 3, 3, "pcd") == 0) {
+    if (pcl::io::loadPCDFile(sceneCloudFilename, *sceneCloudHighRes)) {
+      return -1;
+    }
+  }
+  cout << "cloud size: " << sceneCloudHighRes->size() << endl;
 
   // Read scene octree
   OccupancyMapPtr sceneOccupancyMap (new OccupancyMap);
