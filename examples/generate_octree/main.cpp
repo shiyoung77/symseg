@@ -7,6 +7,7 @@
 #include <experimental/filesystem>
 
 // PCL
+#include <pcl/console/parse.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/common/time.h>
 
@@ -28,8 +29,12 @@ int main(int argc, char** argv)
 {
   octomap::OcTree tree(0.005);
 
-  path dataset = "/home/lsy/software/ssl/dataset";
-  path video = "0001";
+  string dataset_str;
+  string video;
+  pcl::console::parse(argc, argv, "-dataset", dataset_str);
+  pcl::console::parse(argc, argv, "-video", video);
+
+  path dataset(dataset_str);
   path video_folder = dataset / video;
   path pcd_info_path = video_folder / "sampled_pcd" / "info.txt";
 

@@ -188,7 +188,7 @@ int main(int argc, char** argv)
   rotSegParams.max_symmetry_score    = 0.03f;
   rotSegParams.max_occlusion_score   = 0.015f;
   rotSegParams.max_smoothness_score  = 0.3f;
-  rotSegParams.min_segment_size      = 100;
+  rotSegParams.min_segment_size      = 50;  // 100
 
   // Reflectional symmetry detection parameters
   sym::ReflSymDetectParams reflDetParams;
