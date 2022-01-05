@@ -435,22 +435,39 @@ int main(int argc, char** argv)
   system(command.c_str());
 
   std::string outputPath = outputFolder + "/segments.txt";
+  std::string symOutputPath = outputFolder + "/symmetry.txt";
+
   std::ofstream file(outputPath);
-  if (!file.is_open()) {
-    std::cout << outputPath << " cannot be opened. Exit." << std::endl;
-  }
-  for (size_t segId = 0; segId < rotSegmentFilteredIds.size(); ++segId)
-  {
-    std::vector<int> rotSegment = rotSegments[segId];
-    for (size_t lr_idx : rotSegment)
+  std::ofstream symFile(symOutputPath);
+  if (file.is_open() && symFile.is_open()) {
+    for (size_t segId = 0; segId < rotSegmentFilteredIds.size(); ++segId)
     {
-      for (size_t hr_idx : downsampleMap[lr_idx])
+      // save symmetry axis
+      sym::RotationalSymmetry symmetry = rotSymmetryRefined[segId];
+      Eigen::Vector3f origin = symmetry.getOrigin();
+      Eigen::Vector3f direction = symmetry.getDirection();
+      symFile << origin.x() << " " << origin.y() << " " << origin.z() << " "
+              << direction.x() << " " << direction.y() << " " << direction.z() << endl;
+
+      std::vector<int> rotSegment = rotSegments[segId];
+      for (size_t lr_idx : rotSegment)
       {
-        file << hr_idx << " ";
+        for (size_t hr_idx : downsampleMap[lr_idx])
+        {
+          file << hr_idx << " ";
+        }
       }
+      file << std::endl;
     }
-    file << std::endl;
   }
+  else {
+    std::cout << outputPath << " cannot be opened. Exit." << std::endl;
+    exit(1);
+  }
+
+  file.close();
+  symFile.close();
+  exit(0);
 
   //////////////////////////////////////////////////////////////////////////////
   //////////////////////           REFLECTIONAL           //////////////////////
