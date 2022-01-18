@@ -434,40 +434,40 @@ int main(int argc, char** argv)
   std::string command = "mkdir -p " + outputFolder;
   system(command.c_str());
 
-  std::string outputPath = outputFolder + "/segments.txt";
-  std::string symOutputPath = outputFolder + "/symmetry.txt";
+  std::string rotSegmentPath = outputFolder + "/rot_segments.txt";
+  std::string rotSymPath = outputFolder + "/rot_symmetry.txt";
 
-  std::ofstream file(outputPath);
-  std::ofstream symFile(symOutputPath);
-  if (file.is_open() && symFile.is_open()) {
-    for (size_t segId = 0; segId < rotSegmentFilteredIds.size(); ++segId)
+  std::ofstream rotSegmentFile(rotSegmentPath);
+  std::ofstream rotSymFile(rotSymPath);
+  if (rotSegmentFile.is_open() && rotSymFile.is_open()) {
+    for (size_t i = 0; i < rotSegmentFilteredIds.size(); ++i)
     {
       // save symmetry axis
+      size_t segId = rotSegmentFilteredIds[i];
       sym::RotationalSymmetry symmetry = rotSymmetryRefined[segId];
       Eigen::Vector3f origin = symmetry.getOrigin();
       Eigen::Vector3f direction = symmetry.getDirection();
-      symFile << origin.x() << " " << origin.y() << " " << origin.z() << " "
-              << direction.x() << " " << direction.y() << " " << direction.z() << endl;
+      rotSymFile << origin.x() << " " << origin.y() << " " << origin.z() << " "
+                 << direction.x() << " " << direction.y() << " " << direction.z() << endl;
 
       std::vector<int> rotSegment = rotSegments[segId];
       for (size_t lr_idx : rotSegment)
       {
         for (size_t hr_idx : downsampleMap[lr_idx])
         {
-          file << hr_idx << " ";
+          rotSegmentFile << hr_idx << " ";
         }
       }
-      file << std::endl;
+      rotSegmentFile << std::endl;
     }
   }
   else {
-    std::cout << outputPath << " cannot be opened. Exit." << std::endl;
+    std::cout << rotSegmentPath << " cannot be opened. Exit." << std::endl;
     exit(1);
   }
 
-  file.close();
-  symFile.close();
-  exit(0);
+  rotSegmentFile.close();
+  rotSymFile.close();
 
   //////////////////////////////////////////////////////////////////////////////
   //////////////////////           REFLECTIONAL           //////////////////////
@@ -687,19 +687,19 @@ int main(int argc, char** argv)
   std::cout << "  " << reflSegmentMergedIdsRefined.size() << " merged refined segments." << std::endl;
   std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
 
-  for (size_t segId = 0; segId < reflSegmentMergedIdsRefined.size(); ++segId)
-  {
-    std::vector<int> reflSegment = reflSegmentsFinal[segId];
-    for (size_t lr_idx : reflSegment)
-    {
-      for (size_t hr_idx : downsampleMap[lr_idx])
-      {
-        file << hr_idx << " ";
-      }
-    }
-    file << std::endl;
-  }
-  file.close();
+  // for (size_t segId = 0; segId < reflSegmentMergedIdsRefined.size(); ++segId)
+  // {
+  //   std::vector<int> reflSegment = reflSegmentsFinal[segId];
+  //   for (size_t lr_idx : reflSegment)
+  //   {
+  //     for (size_t hr_idx : downsampleMap[lr_idx])
+  //     {
+  //       file << hr_idx << " ";
+  //     }
+  //   }
+  //   file << std::endl;
+  // }
+  // file.close();
 
   //----------------------------------------------------------------------------
   // Remove duplicate symmetries
@@ -733,6 +733,56 @@ int main(int argc, char** argv)
 
     reflSymmetryFinal[segId] = symmetriesFiltered;
   }
+
+  /// save rot segmentation results
+  std::string reflSegmentPath = outputFolder + "/refl_segments.txt";
+  std::string reflSymPath = outputFolder + "/refl_symmetry.txt";
+
+  std::ofstream reflSegmentFile(reflSegmentPath);
+  std::ofstream reflSymFile(reflSymPath);
+  if (reflSegmentFile.is_open() && reflSymFile.is_open()) {
+    for (size_t segId = 0; segId < reflSegmentMergedIdsRefined.size(); ++segId)
+    {
+      // save symmetry origin and normals
+      std::vector<sym::ReflectionalSymmetry> symmetries = reflSymmetryFinal[segId];
+      reflSymFile << symmetries.size() << endl;
+      for (const sym::ReflectionalSymmetry &symmetry : symmetries) {
+        Eigen::Vector3f origin = symmetry.getOrigin();
+        Eigen::Vector3f normal = symmetry.getNormal();
+        reflSymFile << origin.x() << " " << origin.y() << " " << origin.z() << " "
+                    << normal.x() << " " << normal.y() << " " << normal.z() << endl;
+      }
+
+      std::vector<int> reflSegment = reflSegmentsFinal[segId];
+      for (size_t lr_idx : reflSegment)
+      {
+        for (size_t hr_idx : downsampleMap[lr_idx])
+        {
+          reflSegmentFile << hr_idx << " ";
+        }
+      }
+      reflSegmentFile << std::endl;
+    }
+    // for (size_t segId = 0; segId < reflSegmentMergedIdsRefined.size(); ++segId)
+    // {
+    //   std::vector<int> reflSegment = reflSegmentsFinal[segId];
+    //   for (size_t lr_idx : reflSegment)
+    //   {
+    //     for (size_t hr_idx : downsampleMap[lr_idx])
+    //     {
+    //       file << hr_idx << " ";
+    //     }
+    //   }
+    //   file << std::endl;
+    // }
+  }
+  else {
+    std::cout << reflSegmentPath << " cannot be opened. Exit." << std::endl;
+    exit(1);
+  }
+
+  reflSegmentFile.close();
+  reflSymFile.close();
 
   std::cout << "  " << (pcl::getTime() - start) << " seconds." << std::endl;
 
